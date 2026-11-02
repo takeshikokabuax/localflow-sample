@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>LocalFlow | Chrome × Python × Google Sheets</title>
+  <style>
+    :root { --bg:#f4f7fb; --card:#fff; --ink:#1a2940; --muted:#60718b; --line:#dfe6f0;
+      --primary:#245bd6; --primary-deep:#1644ac; --soft:#eaf1ff; --ok:#117552; --warn:#ad6513; --danger:#ad3844; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui,-apple-system,"Noto Sans JP",sans-serif; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; }
+    button:disabled { cursor:not-allowed; opacity:.53; }
+    .shell { max-width:1120px; margin:auto; padding:29px 24px 50px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:23px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand-mark { display:grid; place-items:center; width:43px; height:43px; border-radius:13px;
+      background:#1d56d2; color:white; font-weight:800; font-size:23px; }
+    .brand strong { display:block; font-size:20px; letter-spacing:-.035em; }
+    .brand small { color:var(--muted); font-size:12px; }
+    .runtime { padding:8px 12px; border:1px solid var(--line); border-radius:999px;
+      background:white; color:var(--muted); font-size:13px; white-space:nowrap; }
+    .runtime.ready { background:#e7f8f0; border-color:#bde6d1; color:var(--ok); }
+    .runtime.error { background:#fff0f1; border-color:#f1c3ca; color:var(--danger); }
+    .intro { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:22px; }
+    h1 { font-size:clamp(24px,3.5vw,34px); line-height:1.25; margin:0 0 7px; letter-spacing:-.045em; }
+    p { margin:0; }
+    .intro p,.muted { color:var(--muted); }
+    .seg { display:flex; gap:4px; padding:5px; background:#e8eef7; border-radius:12px; }
+    .seg button { background:transparent; border:0; padding:8px 15px; color:#425a7e; border-radius:8px; font-weight:700; }
+    .seg button.active { background:#fff; color:var(--primary); box-shadow:0 1px 5px #15346519; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:0 3px 14px #1b35530b; }
+    .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:15px; margin-bottom:18px; }
+    .metric { padding:19px 23px; }
+    .metric .k { color:var(--muted); font-size:13px; margin-bottom:7px; }
+    .metric .v { font-size:29px; font-weight:800; letter-spacing:-.04em; }
+    .metric .unit { font-size:14px; color:var(--muted); font-weight:500; margin-left:4px; }
+    .area { display:grid; grid-template-columns:340px 1fr; gap:17px; align-items:start; }
+    .form-card { padding:22px; }
+    h2 { font-size:18px; margin:0 0 15px; letter-spacing:-.02em; }
+    .field { margin:0 0 15px; }
+    .field label { display:block; font-size:13px; color:#45566c; margin-bottom:6px; font-weight:700; }
+    .field input,.field select { width:100%; border:1px solid #cdd8e7; border-radius:9px; background:#fff;
+      height:42px; padding:9px 11px; color:var(--ink); outline:none; }
+    .field input:focus,.field select:focus { border-color:#4d81eb; box-shadow:0 0 0 3px #e2ecff; }
+    .hint { font-size:12px; color:var(--muted); margin-top:5px; }
+    .actions { display:flex; gap:8px; }
+    .btn { border:1px solid var(--line); border-radius:9px; padding:9px 14px; font-weight:700;
+      background:white; color:#334561; }
+    .btn.primary { background:var(--primary); color:white; border-color:var(--primary); }
+    .btn.primary:hover:enabled { background:var(--primary-deep); }
+    .btn.ghost { border:0; background:transparent; color:#48648a; }
+    .btn.sm { font-size:12px; padding:5px 9px; }
+    .form-card .btn.primary { flex:1; }
+    .table-card { min-width:0; overflow:hidden; }
+    .table-head { padding:19px 20px; display:flex; align-items:center; justify-content:space-between; gap:15px; }
+    .table-head h2 { margin:0; }
+    .search { border:1px solid #d5deea; background:#fff; border-radius:9px; padding:9px 11px; width:210px; max-width:100%; }
+    .table-wrap { overflow-x:auto; }
+    table { border-collapse:collapse; width:100%; min-width:590px; }
+    th { text-align:left; font-size:12px; font-weight:700; color:#6c7d94; background:#f7f9fc; padding:11px 15px; white-space:nowrap; }
+    td { border-top:1px solid #eef1f6; padding:13px 15px; vertical-align:middle; font-size:13px; }
+    td.name { font-weight:700; }
+    td.amount { font-variant-numeric:tabular-nums; white-space:nowrap; }
+    td.controls { white-space:nowrap; }
+    .pill { display:inline-block; padding:3px 9px; border-radius:999px; background:#eef2f7; color:#57677f; font-size:12px; }
+    .pill.active { background:#e1f5ed; color:#19734c; }
+    .pill.wait { background:#fff2d9; color:#a66b11; }
+    .empty { text-align:center; padding:40px 15px; color:var(--muted); }
+    .config { padding:19px 22px; margin-bottom:18px; }
+    .config h2 { margin:0 0 5px; }
+    .config p { color:var(--muted); font-size:13px; margin-bottom:15px; }
+    .config-fields { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+    .config .actions { align-items:center; flex-wrap:wrap; }
+    .config-info { font-size:12px; color:#60718b; }
+    .notice { border-radius:11px; padding:11px 14px; background:#eff4fc; color:#40587a; margin-bottom:18px; font-size:13px; }
+    .notice.warn { background:#fff4de; color:#84521b; }
+    .feedback { min-height:22px; font-size:13px; margin-top:12px; color:var(--muted); }
+    .feedback.error { color:var(--danger); }
+    .feedback.ok { color:var(--ok); }
+    .foot { margin-top:20px; font-size:12px; color:#7c89a0; line-height:1.7; }
+    .foot code { background:#e7ecf4; border-radius:4px; padding:1px 4px; }
+    [hidden] { display:none!important; }
+    @media (max-width:800px) { .area { grid-template-columns:1fr; } .summary{gap:9px;} .metric{padding:15px;} .metric .v{font-size:23px;} }
+    @media (max-width:570px) { .shell{padding:16px 12px 32px;} header{align-items:flex-start;}
+      .intro{display:block;} .intro .seg{margin-top:14px;width:max-content;} .summary{grid-template-columns:1fr 1fr;}
+      .summary .metric:last-child{grid-column:span 2;} .config-fields{grid-template-columns:1fr;}
+      .table-head{display:block;} .search{margin-top:12px;width:100%;} }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
+  <script defer src="https://accounts.google.com/gsi/client"></script>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><span class="brand-mark">L</span><div><strong>LocalFlow</strong><small>HTML + JavaScript + Python + Google Sheets</small></div></div>
+      <span id="runtime" class="runtime" role="status">● Pythonを読み込み中...</span>
+    </header>
+    <div class="intro"><div><h1>案件管理サンプル</h1><p>Chromeだけで動く、3層構成のミニ業務アプリ</p></div>
+      <div class="seg" aria-label="データ保存先">
+        <button id="mode-demo" class="active" type="button" aria-pressed="true">デモ（この端末）</button>
+        <button id="mode-sheets" type="button" aria-pressed="false">Google Sheets</button>
+      </div>
+    </div>
+    <div id="demo-notice" class="notice">デモモード：保存先はこのブラウザのローカルストレージです。Google認証なしで操作できます。</div>
+    <section id="config" class="card config" hidden>
+      <h2>Googleスプレッドシートに接続</h2>
+      <p>実データを使う前に、テスト用スプレッドシートを作り、シートのタブ名を <strong>Projects</strong> にしてください。</p>
+      <div id="origin-notice" class="notice warn" hidden>このHTMLを直接開いた <code>file://</code> の画面からはGoogle OAuthを利用できません。Google連携時だけHTTPSの静的ホスティングに配置してください。Linuxは不要です。</div>
+      <div class="config-fields">
+        <div class="field"><label for="client-id">OAuth クライアントID（Webアプリ用）</label>
+          <input id="client-id" autocomplete="off" spellcheck="false" placeholder="xxxx.apps.googleusercontent.com">
+        </div>
+        <div class="field"><label for="spreadsheet-id">スプレッドシートURL または ID</label>
+          <input id="spreadsheet-id" autocomplete="off" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+      </div>
+      <div class="actions"><button id="connect" class="btn primary" type="button">Googleで認証・接続</button>
+        <button id="reload" class="btn" type="button" disabled>再読み込み</button><span id="connection-status" class="config-info">未接続</span></div>
+      <div class="hint">認証用アクセストークンはメモリ内だけで保持します。クライアントIDとシートIDはこのブラウザに保存します。</div>
+    </section>
+    <div class="summary" aria-label="サマリー">
+      <div class="card metric"><div class="k">登録案件数</div><div class="v" id="count">—<span class="unit">件</span></div></div>
+      <div class="card metric"><div class="k">進行中</div><div class="v" id="active-count">—<span class="unit">件</span></div></div>
+      <div class="card metric"><div class="k">予算合計（削除を除く）</div><div class="v" id="total-budget">—<span class="unit">円</span></div></div>
+    </div>
+    <div class="area">
+      <section class="card form-card">
+        <h2 id="form-title">新しい案件を登録</h2>
+        <form id="project-form">
+          <div class="field"><label for="name">案件名 *</label><input id="name" name="name" maxlength="80" required placeholder="例：Webサイト改善"></div>
+          <div class="field"><label for="owner">担当者 *</label><input id="owner" name="owner" maxlength="40" required placeholder="例：担当A"></div>
+          <div class="field"><label for="budget">予算（円） *</label><input id="budget" name="budget" type="number" min="0" max="999999999" step="1" inputmode="numeric" required placeholder="例：120000"></div>
+          <div class="field"><label for="status">ステータス</label><select id="status" name="status"><option>未着手</option><option selected>進行中</option><option>完了</option></select></div>
+          <div class="actions"><button id="submit" class="btn primary" type="submit" disabled>登録する</button><button id="cancel" class="btn" type="button" hidden>キャンセル</button></div>
+        </form>
+        <p id="feedback" class="feedback" aria-live="polite"></p>
+      </section>
+      <section class="card table-card">
+        <div class="table-head"><h2>案件一覧</h2><input id="search" class="search" aria-label="案件を検索" placeholder="案件名・担当者で検索"></div>
+        <div class="table-wrap"><table><thead><tr><th>案件名</th><th>担当</th><th>予算</th><th>状態</th><th>操作</th></tr></thead><tbody id="rows"></tbody></table></div>
+        <div id="empty" class="empty" hidden>該当する案件がありません。</div>
+      </section>
+    </div>
+    <div class="foot">Pythonは <strong>Pyodide</strong> でブラウザ内実行。入力の検証・集計はPythonが担当します。<br>
+      本サンプルは学習・試作向けです。Google Sheets接続にはネット接続とGoogle Cloudの設定が必要です。<code>README.md</code> を参照してください。</div>
+  </div>
+
+  <!-- ビジネスルール層：この中身は本物のPythonです。JSからJSON文字列で入出力します。 -->
+  <script type="text/plain" id="business-python">
+import json
+import re
+
+ALLOWED_STATUS = {"未着手", "進行中", "完了", "削除"}
+
+def validate_project(json_text):
+    """UIやDBに依存しない業務入力ルール。"""
+    data = json.loads(json_text)
+    name = str(data.get("name", "")).strip()
+    owner = str(data.get("owner", "")).strip()
+    budget = str(data.get("budget", "")).strip()
+    status = str(data.get("status", "")).strip()
+    if not name or len(name) > 80:
+        raise ValueError("案件名は1〜80文字で入力してください。")
+    if not owner or len(owner) > 40:
+        raise ValueError("担当者は1〜40文字で入力してください。")
+    if not re.fullmatch(r"[0-9]{1,9}", budget):
+        raise ValueError("予算は0〜999,999,999の整数で入力してください。")
+    if status not in ALLOWED_STATUS or status == "削除":
+        raise ValueError("ステータスは未着手・進行中・完了から選んでください。")
+    return json.dumps({"name": name, "owner": owner, "budget": int(budget), "status": status}, ensure_ascii=False)
+
+def summarize_projects(json_text):
+    """論理削除した案件は件数と予算に含めない。"""
+    rows = [p for p in json.loads(json_text) if p.get("status") != "削除"]
+    return json.dumps({
+        "count": len(rows),
+        "active_count": sum(1 for p in rows if p.get("status") == "進行中"),
+        "total_budget": sum(int(p.get("budget", 0)) for p in rows),
+    }, ensure_ascii=False)
+  </script>
+
+  <script>
+    'use strict';
+    // UI層。Google Sheetsへのアクセス処理はSheetsRepositoryに集約する。
+    const $ = id => document.getElementById(id);
+    const HEADERS = ['ID', '案件名', '担当者', '予算', 'ステータス', '更新日時'];
+    const SHEET = 'Projects';
+    const STORAGE = 'localflow-demo-v1';
+    const CFG_KEY = 'localflow-sheet-config-v1';
+    const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+    const seed = [
+      { id: 'demo-001', name: 'Webサイト改善', owner: '担当A', budget: 120000, status: '進行中', updated: '2026/11/01 09:00' },
+      { id: 'demo-002', name: '顧客ヒアリング', owner: '担当B', budget: 50000, status: '未着手', updated: '2026/11/01 10:00' },
+      { id: 'demo-003', name: '資料の整備', owner: '担当A', budget: 30000, status: '完了', updated: '2026/11/01 11:00' }
+    ];
+    const state = { mode: 'demo', py: null, rows: [], editing: null,
+      accessToken: null, expiresAt: 0, busy: false };
+    function storageRead(key) { try { return localStorage.getItem(key); } catch { return null; } }
+    function storageWrite(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
+    function dateNow() { return new Date().toLocaleString('ja-JP', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false}); }
+    function yen(value) { return Number(value || 0).toLocaleString('ja-JP'); }
+    function feedback(message, kind = '') { $('feedback').textContent = message; $('feedback').className = 'feedback ' + kind; }
+    function runtime(message, kind = '') { $('runtime').textContent = '● ' + message; $('runtime').className = 'runtime ' + kind; }
+    function pythonCall(fn, data) {
+      if (!state.py) throw new Error('Pythonの初期化が完了していません。');
+      state.py.globals.set('input_json', JSON.stringify(data));
+      return JSON.parse(state.py.runPython(fn + '(input_json)'));
+    }
+    function parseId(text) {
+      const val = text.trim();
+      const match = val.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      const id = match ? match[1] : val;
+      if (!/^[a-zA-Z0-9_-]{15,}$/.test(id)) throw new Error('スプレッドシートURLまたはIDを確認してください。');
+      return id;
+    }
+    function cfg() {
+      const clientId = $('client-id').value.trim();
+      if (!/^[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(clientId)) {
+        throw new Error('Google CloudのWebアプリ用OAuthクライアントIDを入力してください。');
+      }
+      return {clientId, spreadsheetId: parseId($('spreadsheet-id').value)};
+    }
+    function saveConfig() {
+      storageWrite(CFG_KEY, JSON.stringify({clientId:$('client-id').value.trim(), sheetId:$('spreadsheet-id').value.trim()}));
+    }
+    let demoMemory = null; // file://などでlocalStorageが禁止された場合の一時保存
+    class DemoRepository {
+      static list() {
+        if (demoMemory) return structuredClone(demoMemory);
+        const raw = storageRead(STORAGE);
+        if (!raw) {
+          const initial = structuredClone(seed);
+          if (!storageWrite(STORAGE, JSON.stringify(initial))) demoMemory = initial;
+          return structuredClone(initial);
+        }
+        try { const rows = JSON.parse(raw); return Array.isArray(rows) ? rows : structuredClone(seed); }
+        catch { return structuredClone(seed); }
+      }
+      static save(rows) {
+        if (!storageWrite(STORAGE, JSON.stringify(rows))) demoMemory = structuredClone(rows);
+        else demoMemory = null;
+      }
+      static create(record) { const rows = this.list(); rows.push(record); this.save(rows); }
+      static update(record) {
+        const rows = this.list(); const i = rows.findIndex(r => r.id === record.id);
+        if (i < 0) throw new Error('対象の案件が見つかりません。');
+        rows[i] = record; this.save(rows);
+      }
+    }
+    class SheetsRepository {
+      constructor(spreadsheetId) { this.id = spreadsheetId; }
+      url(range) { return `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(this.id)}/values/${encodeURIComponent(range)}`; }
+      async request(url, method = 'GET', body) {
+        if (!state.accessToken || Date.now() >= state.expiresAt) {
+          state.accessToken = null;
+          throw new Error('Google認証の有効期限が切れました。「Googleで認証・接続」を押してください。');
+        }
+        const response = await fetch(url, { method,
+          headers: {Authorization:`Bearer ${state.accessToken}`, ...(body ? {'Content-Type':'application/json'} : {})},
+          ...(body ? {body: JSON.stringify(body)} : {}) });
+        const json = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 401) state.accessToken = null;
+          const detail = json.error?.message || `HTTP ${response.status}`;
+          throw new Error(`Google Sheets API: ${detail}`);
+        }
+        return json;
+      }
+      async list() {
+        const data = await this.request(this.url(`${SHEET}!A1:F1000`) + '?valueRenderOption=UNFORMATTED_VALUE');
+        const rows = data.values || [];
+        if (!rows.length || !rows[0].some(x => String(x).trim() !== '')) {
+          await this.request(this.url(`${SHEET}!A1:F1`) + '?valueInputOption=RAW', 'PUT', {values:[HEADERS]});
+          return [];
+        }
+        if (JSON.stringify(rows[0]) !== JSON.stringify(HEADERS)) {
+          throw new Error(`「${SHEET}」タブの1行目が期待した見出しではありません。既存データを守るため処理を停止しました。`);
+        }
+        return rows.slice(1).map((r, i) => ({
+          rowIndex:i+2, id:String(r[0] || ''), name:String(r[1] || ''),
+          owner:String(r[2] || ''), budget:Number(r[3] || 0), status:String(r[4] || ''),
+          updated:String(r[5] || '')
+        })).filter(r => r.id);
+      }
+      row(record) { return [record.id, record.name, record.owner, record.budget, record.status, record.updated]; }
+      async create(record) {
+        await this.request(this.url(`${SHEET}!A1:F`) + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',
+          'POST', {majorDimension:'ROWS', values:[this.row(record)]});
+      }
+      async update(record) {
+        // 手動の行並び替えを考慮し、更新直前に最新のID→行位置を取得。
+        const fresh = (await this.list()).find(r => r.id === record.id);
+        if (!fresh) throw new Error('対象案件が見つかりません。シートを再読み込みしてください。');
+        await this.request(this.url(`${SHEET}!A${fresh.rowIndex}:F${fresh.rowIndex}`) + '?valueInputOption=RAW',
+          'PUT', {values:[this.row(record)]});
+      }
+    }
+    function sheetsRepo() { return new SheetsRepository(parseId($('spreadsheet-id').value)); }
+    function liveRows() { return state.rows.filter(r => r.status !== '削除'); }
+    function render() {
+      const active = liveRows();
+      if (state.py) {
+        const sum = pythonCall('summarize_projects', state.rows);
+        $('count').textContent = yen(sum.count) + ' 件';
+        $('active-count').textContent = yen(sum.active_count) + ' 件';
+        $('total-budget').textContent = yen(sum.total_budget) + ' 円';
+      }
+      const query = $('search').value.toLocaleLowerCase().trim();
+      const results = active.filter(r => (r.name + ' ' + r.owner).toLocaleLowerCase().includes(query));
+      const tbody = $('rows'); tbody.replaceChildren();
+      for (const row of results) {
+        const tr = document.createElement('tr');
+        const td = (text, css = '') => {const cell=document.createElement('td'); cell.textContent=text; if(css)cell.className=css; tr.append(cell); return cell;};
+        td(row.name, 'name'); td(row.owner); td(yen(row.budget) + ' 円', 'amount');
+        const statusCell = td(''); const pill = document.createElement('span');
+        pill.className = 'pill ' + (row.status === '進行中' ? 'active' : row.status === '未着手' ? 'wait' : '');
+        pill.textContent = row.status; statusCell.append(pill);
+        const controls = td('', 'controls');
+        for (const [label, action] of [['編集', 'edit'], ['削除', 'delete']]) {
+          const b = document.createElement('button'); b.type='button'; b.className='btn sm ' + (action==='delete'?'ghost':'');
+          b.textContent=label; b.disabled=state.busy || !state.py;
+          b.addEventListener('click', () => action==='edit' ? editRow(row.id) : deleteRow(row.id));
+          controls.append(b);
+        }
+        tbody.append(tr);
+      }
+      $('empty').hidden = results.length !== 0;
+      $('submit').disabled = !state.py || state.busy || (state.mode === 'sheets' && !state.accessToken);
+      $('reload').disabled = !state.accessToken || state.busy;
+      $('submit').textContent = state.editing ? '更新する' : '登録する';
+    }
+    function resetForm() {
+      state.editing = null; $('project-form').reset(); $('form-title').textContent='新しい案件を登録';
+      $('cancel').hidden=true; feedback(''); render();
+    }
+    function editRow(id) {
+      const row = state.rows.find(r => r.id === id); if (!row) return;
+      state.editing=id; $('name').value=row.name; $('owner').value=row.owner;
+      $('budget').value=String(row.budget); $('status').value=row.status;
+      $('form-title').textContent='案件を編集'; $('cancel').hidden=false; feedback(''); render();
+      $('name').focus();
+    }
+    function busy(on) { state.busy=on; $('mode-demo').disabled=on; $('mode-sheets').disabled=on; $('connect').disabled=on; render(); }
+    async function refresh() {
+      state.rows = state.mode === 'demo' ? DemoRepository.list() : await sheetsRepo().list();
+      render();
+    }
+    async function onSubmit(event) {
+      event.preventDefault(); if (state.busy || !state.py) return;
+      try {
+        const norm = pythonCall('validate_project', {
+          name:$('name').value, owner:$('owner').value,
+          budget:$('budget').value, status:$('status').value });
+        const prev = state.rows.find(r => r.id === state.editing);
+        if (state.editing && !prev) throw new Error('編集対象が見つかりません。');
+        const record = {...norm, id: prev?.id || (crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}`), updated:dateNow()};
+        busy(true);
+        const repo = state.mode==='demo' ? DemoRepository : sheetsRepo();
+        if (prev) await repo.update(record); else await repo.create(record);
+        await refresh(); resetForm(); feedback(prev ? '更新しました。' : '登録しました。', 'ok');
+      } catch (error) { feedback(error.message || String(error), 'error'); }
+      finally {busy(false);}
+    }
+    async function deleteRow(id) {
+      const row = state.rows.find(r => r.id===id); if (!row || state.busy) return;
+      if (!confirm(`「${row.name}」を一覧から削除しますか？\n（シートでは「削除」状態として保持します）`)) return;
+      try {
+        busy(true); const updated = {...row, status:'削除', updated:dateNow()};
+        const repo=state.mode==='demo' ? DemoRepository : sheetsRepo();
+        await repo.update(updated); await refresh(); if (state.editing===id) resetForm(); feedback('論理削除しました。', 'ok');
+      } catch (error) { feedback(error.message || String(error), 'error'); }
+      finally {busy(false);}
+    }
+    function changeMode(next) {
+      if (state.busy) return;
+      state.mode=next; state.editing=null; state.rows=[]; $('search').value='';
+      $('project-form').reset(); $('form-title').textContent='新しい案件を登録'; $('cancel').hidden=true;
+      $('config').hidden=next!=='sheets'; $('demo-notice').hidden=next!=='demo';
+      for (const x of ['demo','sheets']) { $('mode-'+x).classList.toggle('active',x===next); $('mode-'+x).setAttribute('aria-pressed',String(x===next)); }
+      feedback('');
+      if (next==='demo') refresh().catch(e=>feedback(e.message,'error'));
+      else {
+        state.accessToken=null; state.expiresAt=0; $('connection-status').textContent='未接続';
+        $('count').textContent='—'; $('active-count').textContent='—'; $('total-budget').textContent='—'; render();
+      }
+    }
+    function checkOrigin() {
+      const isFile = location.protocol === 'file:';
+      const supported = location.protocol === 'https:' || (location.protocol === 'http:' && ['localhost','127.0.0.1'].includes(location.hostname));
+      $('origin-notice').hidden=supported;
+      return supported && !isFile;
+    }
+    function googleConnect() {
+      try {
+        if (!checkOrigin()) throw new Error('Google認証にはHTTPSの公開元が必要です（file://は不可）。READMEを確認してください。');
+        const {clientId} = cfg(); saveConfig();
+        if (!window.google?.accounts?.oauth2) throw new Error('Googleの認証ライブラリを読み込めません。ネット接続を確認してください。');
+        $('connection-status').textContent='Google認証画面を表示しています...';
+        const tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id:clientId, scope:SCOPE,
+          callback:async response => {
+            if (response.error || !response.access_token) {
+              feedback('Google認証が完了しませんでした: '+(response.error || 'トークンなし'),'error');
+              $('connection-status').textContent='認証失敗'; return;
+            }
+            state.accessToken=response.access_token;
+            state.expiresAt=Date.now() + Math.max(60, Number(response.expires_in || 3600)-60)*1000;
+            try {
+              busy(true); await refresh();
+              $('connection-status').textContent='接続済み：Projectsタブ';
+              feedback('Googleスプレッドシートから読み込みました。','ok');
+            } catch (e) {
+              $('connection-status').textContent='読み込み失敗';
+              feedback(e.message || String(e),'error');
+            } finally {busy(false);}
+          },
+          error_callback: () => {
+            $('connection-status').textContent='認証が閉じられました';
+            feedback('Google認証が完了しませんでした。ポップアップのブロックも確認してください。','error');
+          }
+        });
+        tokenClient.requestAccessToken({prompt:'consent'});
+      } catch (e) { feedback(e.message || String(e),'error'); }
+    }
+    async function init() {
+      const saved=storageRead(CFG_KEY);
+      if (saved) try {const obj=JSON.parse(saved); $('client-id').value=obj.clientId||''; $('spreadsheet-id').value=obj.sheetId||'';} catch {}
+      checkOrigin();
+      $('mode-demo').addEventListener('click',()=>changeMode('demo'));
+      $('mode-sheets').addEventListener('click',()=>changeMode('sheets'));
+      $('project-form').addEventListener('submit',onSubmit);
+      $('search').addEventListener('input',render);
+      $('cancel').addEventListener('click',resetForm);
+      $('connect').addEventListener('click',googleConnect);
+      $('reload').addEventListener('click',async()=>{try {busy(true);await refresh();feedback('再読み込みしました。','ok');}catch(e){feedback(e.message,'error');}finally{busy(false);}});
+      try {
+        if (typeof loadPyodide !== 'function') throw new Error('Pyodideを読み込めません。インターネット接続を確認してください。');
+        state.py=await loadPyodide();
+        state.py.runPython($('business-python').textContent);
+        const test=pythonCall('summarize_projects',[]);
+        if (test.count!==0) throw new Error('Python初期化テストに失敗しました。');
+        runtime('Python準備完了（Pyodide）','ready');
+        await refresh();
+      } catch (e) {
+        state.py=null; runtime('Python初期化エラー','error');
+        feedback(e.message || String(e),'error');
+      }
+    }
+    window.addEventListener('load',init);
+  </script>
+</body>
+</html>
